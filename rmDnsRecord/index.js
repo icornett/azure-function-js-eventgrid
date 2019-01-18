@@ -21,5 +21,9 @@ module.exports = async function (context, eventGridEvent) {
 };
 
 function rmDnsRecord(resourceUri, subscriptionId) {
+    msRestAzure
+        .loginWithAppServiceMSI()
+        .then(credentials => {
 
+        })
 }
