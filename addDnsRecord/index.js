@@ -1,15 +1,17 @@
-const msRestAzure = require('ms-rest-azure');
-const DNSManagment = require('azure-arm-dns');
-const NetworkMgmtClient = require('azure-arm-network');
-const ResourceMgmtClient = require('azure-arm-resource').ResourceManagementClient;
+/* eslint-disable no-console */
+/* eslint-disable func-names */
+// const msRestAzure = require('ms-rest-azure');
+// const DNSManagment = require('azure-arm-dns');
+// const NetworkMgmtClient = require('azure-arm-network');
+// const ResourceMgmtClient = require('azure-arm-resource').ResourceManagementClient;
 
 function addDnsRecord(resourceUri, subscriptionId) {
-    console.log("Resource ID: " + resourceUri + ", Subscription ID: " + subscriptionId);
+  console.log(`Resource ID: ${resourceUri}, Subscription ID: ${subscriptionId}`);
 /*  msRestAzure
     .loginWithAppServiceMSI()
     .then((credentials) => {
 
-    });*/
+    }); */
 }
 
 module.exports = async function (context, eventGridEvent) {
