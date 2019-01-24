@@ -1,0 +1,117 @@
+{
+  "destination": {
+    "eventSubscriptionId": "/subscriptions/c4f24e3b-8f03-4d0e-86bc-528ad4dad3c6/resourceGroups/icornett-test/providers/Microsoft.EventGrid/eventSubscriptions/test-subscription"
+  },
+  "numberOfEvents": 1,
+  "jsonSchemaFakerOptions": {
+    "useDefaultValue": true,
+    "alwaysFakeOptionals": true
+  },
+  "schema": {
+    "type": "object",
+    "description": "Properties of an Event Grid event with additional metadata for generating mock values.",
+    "required": [
+      "id",
+      "subject",
+      "data",
+      "eventType",
+      "eventTime",
+      "dataVersion"
+    ],
+    "properties": {
+      "topic": {
+        "description": "The resource path of the event source.",
+        "type": "string",
+        "default": "/subscriptions/c4f24e3b-8f03-4d0e-86bc-528ad4dad3c6/resourceGroups/icornett-test"
+      },
+      "subject": {
+        "description": "A resource path relative to the topic path.",
+        "type": "string",
+        "pattern": "/subscriptions/[a-zA-Z0-9]+/resourceGroups/[a-zA-Z0-9]+/providers/Microsoft\\.[a-zA-Z0-9]+/[a-zA-Z0-9]+"
+      },
+      "eventType": {
+        "description": "The type of the event that occurred.",
+        "type": "string",
+        "pattern": "Microsoft\\.Resources\\.Resource(Write|Delete)(Success|Failure|Cancel)"
+      },
+      "eventTime": {
+        "description": "The time (in UTC) the event was generated.",
+        "type": "string",
+        "format": "date-time"
+      },
+      "id": {
+        "description": "An unique identifier for the event.",
+        "type": "string",
+        "chance": "guid"
+      },
+      "data": {
+        "description": "Schema of the data property of an Event Grid event for a Microsoft.Resources event with additional metadata for generating mock values.",
+        "type": "object",
+        "properties": {
+          "authorization": {
+            "description": "The requested authorization for the operation.",
+            "type": "object"
+          },
+          "claims": {
+            "description": "The properties of the claims.",
+            "type": "object"
+          },
+          "correlationId": {
+            "description": "An operation ID used for troubleshooting.",
+            "type": "string",
+            "chance": "guid"
+          },
+          "resourceProvider": {
+            "description": "The resource provider performing the operation.",
+            "type": "string",
+            "pattern": "Microsoft\\.[a-zA-Z0-9]+"
+          },
+          "resourceUri": {
+            "description": "The URI of the resource in the operation.",
+            "type": "string",
+            "pattern": "/subscriptions/[a-zA-Z0-9]+/resourceGroups/[a-zA-Z0-9]+/providers/Microsoft\\.[a-zA-Z0-9]+/[a-zA-Z0-9]+"
+          },
+          "operationName": {
+            "description": "The operation that was performed.",
+            "type": "string",
+            "pattern": "Microsoft\\.[a-zA-Z0-9]+/.[a-zA-Z0-9]+/(write|delete)"
+          },
+          "status": {
+            "description": "The status of the operation.",
+            "type": "string",
+            "chance": {
+              "pickone": [
+                [
+                  "Succeeded",
+                  "Failed",
+                  "Canceled"
+                ]
+              ]
+            }
+          },
+          "subscriptionId": {
+            "description": "The subscription ID of the resource.",
+            "type": "string",
+            "chance": "guid"
+          },
+          "tenantId": {
+            "description": "The tenant ID of the resource.",
+            "type": "string",
+            "chance": "guid"
+          }
+        }
+      },
+      "dataVersion": {
+        "description": "The schema version of the data object.",
+        "type": "string",
+        "pattern": "[1-9]{1}"
+      },
+      "metadataVersion": {
+        "description": "The schema version of the event metadata.",
+        "readOnly": true,
+        "type": "string",
+        "pattern": "[1-9]{1}"
+      }
+    }
+  }
+}
