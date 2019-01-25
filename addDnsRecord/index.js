@@ -2,38 +2,49 @@
 /* eslint-disable no-console */
 /* eslint-disable func-names */
 const msRestAzure = require('ms-rest-azure');
-const DNSManagment = require('azure-arm-dns');
+// const DNSManagment = require('azure-arm-dns');
 const NetworkMgmtClient = require('azure-arm-network');
-const ResourceMgmtClient = require('azure-arm-resource').ResourceManagementClient;
+// const ResourceMgmtClient = require('azure-arm-resource').ResourceManagementClient;
 const ComputeMgmtClient = require('azure-arm-compute');
 
-function addDnsRecord(resourceUri, subscriptionId) {
-  console.log(`Resource ID: ${resourceUri}, Subscription ID: ${subscriptionId}`);
-  // let virtualMachine;
-  const resourceData = resourceUri.split('/');
-  console.log(`Resource Group:\t${resourceData[4]}`);
-  console.log(`VM Name:\t${resourceData[resourceData.length - 1]}`);
-  msRestAzure
-    .loginWithUsernamePassword('icornett@redapt.com', '#######')
+async function addDnsRecord(resourceUri, subscriptionId, context) {
+  const vmPath = resourceUri.split('/');
+  // const dnsClient = new DNSManagment(credentials, subscriptionId);
+  msRestAzure.interactiveLogin()
     .then((credentials) => {
       const computeClient = new ComputeMgmtClient(credentials, subscriptionId);
-      computeClient.virtualMachineId.get(
-        resourceData[4], // Resource Group Name
-        resourceData[resourceData.length - 1], // Virtual Machine Name
-        (err, result) => {
+      computeClient.virtualMachines.get(
+        vmPath[4], // Resource Group Name
+        vmPath[vmPath.length - 1], // Virtual Machine Name
+        { expand: 'instanceView' },
+        (err, info) => {
           if (err) {
-            console.log('An error occurred while getting VM info');
-            console.log(err.toString());
-          } else {
-            // virtualMachine = result;
-            console.log(JSON.stringify(result));
+            context.log('An error occurred while getting VM info!\n');
+            context.log(err.message);
           }
+          context.log(`Got VM Information for VM \n${JSON.stringify(info)}`);
+          return { vmInfo: info, credential: credentials };
+        },
+        (err) => {
+          context.log(`An error occurred while trying to get VM information! The error was:\t${err.message}`);
         },
       );
     })
-    .catch(
-      (err) => { console.log(`${'an error occurred!\t'}${err.message}`); },
-    );
+    .then((vmInfo, credential) => {
+      const networkClient = new NetworkMgmtClient(credential, subscriptionId);
+      const nic0Path = vmInfo.networkProfiles.networkInterfaces[0].split('/');
+      networkClient.networkInterfaces.get(
+        nic0Path[4], // Resource ID
+        nic0Path[nic0Path.length - 1], // NIC ID
+        (err, info) => {
+          if (err) {
+            console.log(err);
+          }
+          context.log(`Got NIC info for NIC\n${JSON.stringify(info)}`);
+          return info;
+        },
+      );
+    });
 }
 
 module.exports = async function run(context, eventGridEvent) {
@@ -51,7 +62,7 @@ module.exports = async function run(context, eventGridEvent) {
   } else if (eventGridEvent.eventType === WriteSuccess) {
     if (eventData.operationName === VmWrite) {
       console.log('Attempting to create DNS Record');
-      addDnsRecord(eventData.resourceUri, eventData.subscriptionId);
+      addDnsRecord(eventData.resourceUri, eventData.subscriptionId, context);
     }
   }
 };
