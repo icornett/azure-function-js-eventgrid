@@ -6,12 +6,7 @@ const ComputeManagementClient = require('azure-arm-compute');
 const DNSManagement = require('azure-arm-dns');
 const msRestAzure = require('ms-rest-azure');
 const NetworkManagementClient = require('azure-arm-network');
-// eslint-disable-next-line prefer-destructuring
-const ResourceManagementClient = require('azure-arm-resource').ResourceManagementClient;
-
-function checkPrimary(ipConfiguration) {
-  return ipConfiguration.primary === true;
-}
+const { ResourceManagementClient } = require('azure-arm-resource');
 
 async function getNicInfo(vmInfo, credentials, subscriptionId) {
   const networkClient = new NetworkManagementClient(credentials, subscriptionId);
@@ -20,10 +15,6 @@ async function getNicInfo(vmInfo, credentials, subscriptionId) {
     nic0Path[4], // Resource ID
     nic0Path[nic0Path.length - 1], // NIC ID
   );
-}
-
-async function getZonesFromRg(dnsClient, rgInfo) {
-  return dnsClient.zones.listByResourceGroup(rgInfo.name);
 }
 
 async function getVmInfo(vmPath, credentials, subscriptionId) {
@@ -40,29 +31,49 @@ async function getZoneInfo(nicInfo, dnsClient, zoneList, rgName) {
   return dnsClient.recordSets.listByType(rgName, zoneName, 'A');
 }
 
-async function isRecordExisting(rgName, vmName, zoneName, dnsClient) {
-  return dnsClient.recordSets.get(rgName, zoneName, vmName, 'A');
+async function getZonesFromRg(dnsClient, nicInfo) {
+  const subnetPath = nicInfo.ipConfigurations[0].subnet.id.split('/');
+  return dnsClient.zones.listByResourceGroup(subnetPath[4]);
 }
 
-async function setDnsARecord(nicInfo, dnsClient, zoneList, zoneRecords, rgName, vmName, context) {
-  const zoneName = zoneList[0].name;
-  const ipAddress = nicInfo.ipConfigurations.filter(checkPrimary);
-  isRecordExisting(rgName, vmName, zoneName, dnsClient)
-    .then((exists) => {
-      if (exists && zoneList.length > 0) {
-        throw new Error(`Record exists:\n${JSON.stringify(exists)}`);
-      }
-
-      dnsClient.recordSets.createOrUpdate(rgName, zoneName, vmName, 'A', {
-        aRecords: [
-          ipAddress[0].privateIPAddress,
-        ],
-      });
+async function createOrUpdateRecord(rgName, zoneName, vmName, ipv4Address, dnsClient) {
+  const aRecord = new dnsClient.recordSet.ARecord(ipv4Address);
+  return (
+    dnsClient.recordSets.createOrUpdate(rgName, zoneName, vmName, 'A', {
+      aRecords: [
+        aRecord,
+      ],
     })
-    .catch(err => context.log(`Error occurred while setting the DNS A Record!\nThe error was:\t${err.message}\n${JSON.stringify(err)}`));
+  );
 }
 
-async function addDnsRecord(resourceUri, subscriptionId, zoneName, context) {
+async function setDnsARecord(nicInfo, dnsClient, zoneList, zoneRecords, rgName, vmName) {
+  const zoneName = zoneList[0].name;
+  const ipAddress = nicInfo.ipConfigurations[0].privateIPAddress;
+
+  if (zoneRecords.length === 0) {
+    console.log(`Setting ${vmName} IP v4 address to:\t${ipAddress}`);
+    try {
+      createOrUpdateRecord(rgName, zoneName, vmName, ipAddress, dnsClient);
+    } catch (e) {
+      console.log(`Could not update record, error was ${e.message}`);
+    }
+  } else if (zoneRecords.filter(record => record.name === vmName)) {
+    if (zoneRecords.filter(record => record.aRecords.ipv4Address === ipAddress)) {
+      console.log(`DNS 'A' Record exists for IPv4 Address:\t${ipAddress}`);
+    } else {
+      console.log('This record does not match...  updating');
+      createOrUpdateRecord(rgName, zoneName, vmName, ipAddress, dnsClient)
+        .catch(e => console.log(`An error occurred while updating, the error was:\t${e.message}`));
+    }
+  } else {
+    console.log(`Attempting to add new DNS 'A' Record for:\t${vmName} at IP Address ${ipAddress}`);
+    createOrUpdateRecord(rgName, zoneName, vmName, ipAddress, dnsClient)
+      .catch(e => console.log(`An error occurred while updating, the error was:\t${e.message}`));
+  }
+}
+
+async function addDnsRecord(resourceUri, subscriptionId, context) {
   let nicInfo;
   let rgInfo;
   let vmInfo;
@@ -79,11 +90,11 @@ async function addDnsRecord(resourceUri, subscriptionId, zoneName, context) {
   async.series([
     rgInfo = await resourceClient.resourceGroups.get(rgName)
       .catch(e => context.log(e.message)),
-    zoneList = await getZonesFromRg(dnsClient, rgInfo)
-      .catch(e => context.log(e.message)),
     vmInfo = await getVmInfo(vmPath, credentials, subscriptionId, context)
       .catch(e => context.log(e.message)),
     nicInfo = await getNicInfo(vmInfo, credentials, subscriptionId)
+      .catch(e => context.log(e.message)),
+    zoneList = await getZonesFromRg(dnsClient, nicInfo)
       .catch(e => context.log(e.message)),
     zoneRecords = await getZoneInfo(nicInfo, dnsClient, zoneList, rgInfo.name, context)
       .catch(e => context.log(e.message)),
@@ -115,7 +126,8 @@ module.exports = async function run(context, eventGridEvent) {
   } else if (eventGridEvent.eventType === WriteSuccess) {
     if (eventData.operationName === VmWrite) {
       console.log('Attempting to create DNS Record');
-      addDnsRecord(eventData.resourceUri, eventData.subscriptionId, context);
+      addDnsRecord(eventData.resourceUri, eventData.subscriptionId, context)
+        .catch(e => context.log(`An error occurred while adding your DNS record, as such we suck and have failed you... \n${e.message}`));
     }
   }
 };
